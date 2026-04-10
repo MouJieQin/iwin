@@ -2,7 +2,9 @@ const { app, Tray, screen, Menu, BrowserWindow } = require("electron");
 const path = require("path");
 const http = require("http");
 const WebSocket = require("ws");
-const fixedWindowsManager = require("./fixedWindowsManager.js");
+const fixedWindowsManager = require("./fixedWindowsManager");
+const wsServer = require("./websocket-server"); // 引入全局服务
+const apiServer = require("./http-api-server");
 
 let webSocket = {};
 
@@ -12,6 +14,46 @@ let tray;
 
 // 禁止程序显示在 Dock 栏（关键）
 app.dock.hide();
+
+function startWebSocketServer() {
+    wsServer.start();
+    // 监听服务事件 → 推送到界面
+    wsServer.onClientConnected = (client) => {
+        console.log("log", `✅ 连接：${client.path} (${client.id})`);
+    };
+
+    wsServer.onClientDisconnected = (client) => {
+        console.log("log", `❌ 断开：${client.path}`);
+    };
+
+    wsServer.onMessageReceived = (client, msg) => {
+        console.log("log", `📩 ${client.path}：${msg}`);
+    };
+}
+
+// 启动 HTTP 接口服务
+function startHttpServer() {
+    // ------------------------------
+    // 注册你要的 POST 接口
+    // ------------------------------
+
+    // 示例 1：通用 JSON 接收
+    apiServer.post("/api/voichai", (json, callback) => {
+        console.log("收到 POST JSON：", json);
+
+        // 返回给调用方（Python/其他客户端）
+        callback({ success: true, data: "已接收" });
+    });
+
+    // 示例 2：AI 消息接口
+    apiServer.post("/api/mxdict", (json, callback) => {
+        console.log("收到 mxdict 消息：", json);
+        callback({ success: true, msg: "消息已处理" });
+    });
+
+    // 启动服务
+    apiServer.start();
+}
 
 // websocket
 function retryWebsocketConnection() {
@@ -147,6 +189,8 @@ function createTray() {
 app.whenReady().then(async () => {
     createWindow();
     createTray();
+    startHttpServer();
+    startWebSocketServer();
     await webSocketManager();
 
     app.on("activate", () => {
