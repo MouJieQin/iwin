@@ -6,9 +6,9 @@ const fixedWindows = {};
 
 /**
  * 创建置顶悬浮固定窗口
- * @param {string} url - 窗口加载的 URL，默认本地 3999
+ * @param {string} url - 窗口加载的 URL
  */
-function createFixedWindow(url = "http://localhost:3999/") {
+function createFixedWindow(url) {
     // 如果窗口已存在，直接显示并置顶
     if (fixedWindows[url]?.fixedWindow) {
         const win = fixedWindows[url].fixedWindow;

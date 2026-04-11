@@ -2,9 +2,11 @@ const { app, Tray, screen, Menu, BrowserWindow } = require("electron");
 const path = require("path");
 const http = require("http");
 const WebSocket = require("ws");
+const axios = require("axios");
 const fixedWindowsManager = require("./fixedWindowsManager");
 const wsServer = require("./websocket-server"); // 引入全局服务
 const apiServer = require("./http-api-server");
+global.wsServer = wsServer;
 
 let webSocket = {};
 
@@ -33,26 +35,94 @@ function startWebSocketServer() {
 
 // 启动 HTTP 接口服务
 function startHttpServer() {
-    // ------------------------------
-    // 注册你要的 POST 接口
-    // ------------------------------
-
-    // 示例 1：通用 JSON 接收
+    // 示例接口
     apiServer.post("/api/voichai", (json, callback) => {
         console.log("收到 POST JSON：", json);
-
-        // 返回给调用方（Python/其他客户端）
         callback({ success: true, data: "已接收" });
     });
 
-    // 示例 2：AI 消息接口
-    apiServer.post("/api/mxdict", (json, callback) => {
+    // ✅ 修复后的 mxdict 接口
+    apiServer.post("/api/mxdict", async (json, callback) => {
         console.log("收到 mxdict 消息：", json);
-        callback({ success: true, msg: "消息已处理" });
+
+        try {
+            const { type, data } = json;
+
+            // ✅ 关键：setup 不再传入 callback，只返回结果
+            const setupOk = await handl_mxdict_message_setup();
+            if (!setupOk) {
+                callback({
+                    success: false,
+                    msg: "mxdict 未连接或连接超时",
+                });
+                return;
+            }
+
+            // 处理业务
+            switch (type) {
+                case "toggle_top_window":
+                    handle_mxdict_toggle_top_window(data);
+                    break;
+                default:
+                    callback({ success: false, msg: "未知 type 类型" });
+                    return;
+            }
+
+            // 成功返回
+            callback({ success: true, msg: "处理完成" });
+        } catch (err) {
+            console.error("处理 mxdict 错误：", err);
+            callback({ success: false, msg: "服务器错误：" + err.message });
+        }
     });
 
-    // 启动服务
     apiServer.start();
+}
+
+// ✅ 不再传入 callback，只返回 true/false
+async function handl_mxdict_message_setup() {
+    // 已经连接，直接返回成功
+    if (global.wsServer.connections["/ws/mxdict"]) {
+        return true;
+    }
+
+    try {
+        // 1. 调用 Python 接口
+        const response = await axios.get(
+            "http://localhost:5959/api/connectiwin",
+        );
+
+        // 2. 检查返回状态
+        if (!response.data.status) {
+            console.log("❌ 命令 mxdict 连接 iwin 失败");
+            return false;
+        }
+
+        // 3. 等待连接成功（最多 5 秒）
+        let waiting_count = 0;
+        while (waiting_count < 10) {
+            // console.log("global.wsServer:", global.wsServer);
+            // console.log("wsServer:", wsServer);
+
+            if (global.wsServer.connections["/ws/mxdict"]) {
+                return true;
+            }
+            await new Promise((resolve) => setTimeout(resolve, 500));
+            waiting_count++;
+        }
+
+        // 超时
+        console.log("❌ 等待 mxdict 连接超时");
+        return false;
+    } catch (err) {
+        console.log("❌ 请求 connectiwin 接口失败：", err.message);
+        return false;
+    }
+}
+
+function handle_mxdict_toggle_top_window(data) {
+    fixedWindowsManager.toggleWindowVisible(data.url);
+    console.log("toggle top window:", data.url);
 }
 
 // websocket

@@ -4,39 +4,35 @@ class HttpApiServer {
     constructor(port) {
         this.port = port;
         this.server = null;
-        this.routes = {}; // 路由注册
+        this.routes = {};
     }
 
-    // 启动服务
     start() {
-        this.server = http.createServer((req, res) => {
-            // 跨域支持
+        this.server = http.createServer(async (req, res) => {
             res.setHeader("Access-Control-Allow-Origin", "*");
             res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
             res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-            // 处理 OPTIONS 预检请求
             if (req.method === "OPTIONS") {
                 res.writeHead(200);
                 res.end();
                 return;
             }
 
-            // 只处理 POST + JSON
             if (
                 req.method === "POST" &&
                 req.headers["content-type"]?.includes("application/json")
             ) {
                 let body = "";
                 req.on("data", (chunk) => (body += chunk));
-                req.on("end", () => {
+                req.on("end", async () => {
                     try {
                         const json = JSON.parse(body);
                         const path = req.url;
 
-                        // 触发对应路由回调
                         if (this.routes[path]) {
-                            this.routes[path](json, (response) => {
+                            // 🔥 这里支持 async 了
+                            await this.routes[path](json, (response) => {
                                 res.writeHead(200, {
                                     "Content-Type": "application/json",
                                 });
@@ -60,7 +56,7 @@ class HttpApiServer {
                         res.end(
                             JSON.stringify({
                                 success: false,
-                                msg: "JSON 格式错误",
+                                msg: "JSON 格式错误：" + e.message,
                             }),
                         );
                     }
@@ -75,22 +71,19 @@ class HttpApiServer {
 
         this.server.listen(this.port, () => {
             console.log(
-                `✅ Electron HTTP API 已启动：http://localhost:${this.port}`,
+                `✅ Electron API 服务已启动：http://localhost:${this.port}`,
             );
         });
     }
 
-    // 注册 POST 接口
     post(path, handler) {
         this.routes[path] = handler;
     }
 
-    // 关闭服务
     close() {
         if (this.server) this.server.close();
     }
 }
 
-// 导出单例（全局共用）
 const apiServer = new HttpApiServer(9797);
 module.exports = apiServer;
