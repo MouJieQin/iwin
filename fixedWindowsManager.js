@@ -6,12 +6,15 @@ const fixedWindows = {};
 
 /**
  * 创建置顶悬浮固定窗口
+ * @param {string} winId - 窗口唯一标识符
  * @param {string} url - 窗口加载的 URL
+ * @param {string} wsId - WebSocket 连接 ID
+ * @param {string} session_id - 会话 ID
  */
-function createFixedWindow(url) {
+function createFixedWindow(winId, url, wsId, session_id) {
     // 如果窗口已存在，直接显示并置顶
-    if (fixedWindows[url]?.fixedWindow) {
-        const win = fixedWindows[url].fixedWindow;
+    if (fixedWindows[winId]?.fixedWindow) {
+        const win = fixedWindows[winId].fixedWindow;
         if (win.isMinimized()) win.restore();
         win.show();
         win.focus();
@@ -19,7 +22,13 @@ function createFixedWindow(url) {
     }
 
     // 初始化窗口实例
-    fixedWindows[url] = { fixedWindow: null, pin: false };
+    fixedWindows[winId] = {
+        fixedWindow: null,
+        pin: false,
+        url: url,
+        Id: winId,
+        session_id: session_id,
+    };
 
     const win = new BrowserWindow({
         width: 700,
@@ -27,6 +36,10 @@ function createFixedWindow(url) {
         alwaysOnTop: true,
         movable: true,
         titleBarStyle: "hidden", // 隐藏原生标题栏
+        // transparent: true,
+        // 毛玻璃效果（仅限 macOS）
+        // vibrancy: "ultra-dark",
+
         webPreferences: {
             preload: path.join(__dirname, "preload.js"),
             contextIsolation: true,
@@ -34,7 +47,7 @@ function createFixedWindow(url) {
         },
     });
 
-    fixedWindows[url].fixedWindow = win;
+    fixedWindows[winId].fixedWindow = win;
 
     // 窗口出现在鼠标右下角
     const mouse = screen.getCursorScreenPoint();
@@ -46,9 +59,9 @@ function createFixedWindow(url) {
         win.setVisibleOnAllWorkspaces(false, {
             visibleOnFullScreen: true,
         });
-        fixedWindows[url].pin = true; // 默认固定
+        fixedWindows[winId].pin = true; // 默认固定
     } else {
-        fixedWindows[url].pin = false; // Windows/Linux 默认不固定
+        fixedWindows[winId].pin = false; // Windows/Linux 默认不固定
     }
 
     // 加载页面
@@ -60,25 +73,25 @@ function createFixedWindow(url) {
 
     // 窗口完全销毁时清理对象
     win.on("closed", () => {
-        if (fixedWindows[url]) {
-            fixedWindows[url].fixedWindow = null;
-            delete fixedWindows[url];
+        if (fixedWindows[winId]) {
+            fixedWindows[winId].fixedWindow = null;
+            delete fixedWindows[winId];
         }
     });
 
     // 失焦隐藏（未固定时）
     win.on("blur", () => {
-        const { pin } = fixedWindows[url];
+        const { pin } = fixedWindows[winId];
         if (!pin && win.isVisible()) {
             win.hide();
         }
     });
 
-    // 首次显示时发送 WebSocket 状态
+    // 首次显示时发送 pin 状态
     win.once("show", async () => {
         try {
             setTimeout(() => {
-                sendPinStatus(url);
+                sendPinStatus(wsId, fixedWindows[winId].pin, session_id);
             }, 1000);
         } catch (err) {
             console.log("WebSocket 发送失败:", err);
@@ -86,44 +99,51 @@ function createFixedWindow(url) {
     });
 }
 
-const sendWebSocketMessage = async (message) => {
-    if (global.webSocket) {
-        await global.webSocket.send(JSON.stringify(message));
+const sendWebSocketMessage = async (wsId, message) => {
+    const ws = global.wsServer.getConnections()[wsId].ws;
+    if (ws) {
+        await ws.send(JSON.stringify(message));
     } else {
-        console.log("WebSocket 未初始化，无法发送消息");
+        console.log("WebSocket: id:" + wsId + "未初始化，无法发送消息");
     }
 };
 
-const sendPinStatus = async (url) => {
-    const slices = url.split("/");
-    const session_id = slices[slices.length - 1] || "";
-    await sendWebSocketMessage({
-        type: "toggle_float_pin",
+const sendPinStatus = async (wsId, pin, session_id) => {
+    await sendWebSocketMessage(wsId, {
+        type: "toggle_floating_pin",
         data: {
-            url,
-            session_id,
-            is_pinned: fixedWindows[url].pin,
+            session_id: session_id,
+            is_pinned: pin,
         },
     });
 };
 
 /**
  * 切换窗口固定状态（对外暴露方法）
- * @param {string} url
+ * @param {string} winId
+ * @param {string} wsId
+ * @param {string} session_id
  */
-function togglePinWindow(url) {
-    if (!fixedWindows[url]) return;
-    fixedWindows[url].pin = !fixedWindows[url].pin;
-    sendPinStatus(url);
+function togglePinWindow(winId, wsId, session_id) {
+    if (!fixedWindows[winId]) {
+        return;
+    }
+    fixedWindows[winId].pin = !fixedWindows[winId].pin;
+    sendPinStatus(wsId, fixedWindows[winId].pin, session_id);
 }
 
 /**
  * 显示/隐藏窗口（对外暴露方法）
+ * @param {string} winId
  * @param {string} url
+ * @param {string} wsId
+ * @param {string} session_id
  */
-function toggleWindowVisible(url) {
-    if (!fixedWindows[url]) return createFixedWindow(url);
-    const win = fixedWindows[url].fixedWindow;
+function toggleWindowVisible(winId, url, wsId, session_id) {
+    if (!fixedWindows[winId]) {
+        return createFixedWindow(winId, url, wsId, session_id);
+    }
+    const win = fixedWindows[winId].fixedWindow;
     if (win.isVisible()) {
         win.hide();
     } else {

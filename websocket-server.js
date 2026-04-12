@@ -32,28 +32,38 @@ class WebSocketServerManager {
             // 🔴 关键：获取客户端连接的路径
             const path = request.url;
             // 生成唯一ID
-            const clientId = uuidv4();
+            const clientId = path + "-" + uuidv4();
 
             // 存入分组
-            if (!this.connections[path]) this.connections[path] = [];
-            const clientInfo = { id: clientId, ws, path };
-            this.connections[path].push(clientInfo);
+            if (!this.connections[clientId]) this.connections[clientId] = [];
+            const clientInfo = { ws: ws, id: clientId, path: path };
+            this.connections[clientId] = clientInfo;
+            const msg = {
+                type: "client_id",
+                data: { client_id: clientId },
+            };
+            ws.send(JSON.stringify(msg));
+            // this._sendIdToClient(clientId); // 连接成功后，发送唯一ID给客户端
 
             console.log(`📥 新连接 [${path}] 客户端ID：${clientId}`);
-            if (this.onClientConnected) this.onClientConnected(clientInfo);
+            if (this.onClientConnected) {
+                this.onClientConnected(clientInfo);
+            }
 
             // 消息监听
             ws.on("message", (data) => {
                 const msg = data.toString();
-                if (this.onMessageReceived)
+                if (this.onMessageReceived) {
                     this.onMessageReceived(clientInfo, msg);
+                }
             });
 
             // 断开连接
             ws.on("close", () => {
                 this._removeClient(path, clientId);
-                if (this.onClientDisconnected)
+                if (this.onClientDisconnected) {
                     this.onClientDisconnected(clientInfo);
+                }
             });
 
             // 错误
@@ -63,13 +73,19 @@ class WebSocketServerManager {
         });
     }
 
+    _sendIdToClient(clientID) {
+        this.connections[clientID]?.ws.send({
+            type: "client_id",
+            data: { client_id: clientID },
+        });
+    }
+
     // 🔴 移除断开的客户端
     _removeClient(path, clientId) {
-        if (!this.connections[path]) return;
-        this.connections[path] = this.connections[path].filter(
-            (c) => c.id !== clientId,
-        );
-        if (this.connections[path].length === 0) delete this.connections[path];
+        if (!this.connections[clientId]) {
+            return;
+        }
+        delete this.connections[clientId];
     }
 
     // ------------------------------
@@ -78,9 +94,11 @@ class WebSocketServerManager {
 
     // 1. 发给【某个路径】的所有客户端
     sendToPath(path, message) {
-        const clients = this.connections[path] || [];
-        clients.forEach((client) => {
-            if (client.ws.readyState === WebSocket.OPEN) {
+        this.connections.forEach((client) => {
+            if (
+                client.path === path &&
+                client.ws.readyState === WebSocket.OPEN
+            ) {
                 client.ws.send(JSON.stringify(message));
             }
         });
@@ -88,16 +106,13 @@ class WebSocketServerManager {
 
     // 2. 发给【单个客户端】（通过ID）
     sendToClient(clientId, message) {
-        for (const path in this.connections) {
-            const client = this.connections[path].find(
-                (c) => c.id === clientId,
-            );
-            if (client) {
-                client.ws.send(JSON.stringify(message));
-                return true;
-            }
+        try {
+            this.connections[clientId]?.ws.send(JSON.stringify(message));
+            return true;
+        } catch (err) {
+            console.error(`发送消息失败，客户端ID：${clientId}，错误：`, err);
+            return false;
         }
-        return false;
     }
 
     // 3. 广播所有客户端

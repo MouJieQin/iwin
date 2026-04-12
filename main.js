@@ -6,7 +6,8 @@ const axios = require("axios");
 const fixedWindowsManager = require("./fixedWindowsManager");
 const wsServer = require("./websocket-server"); // 引入全局服务
 const apiServer = require("./http-api-server");
-global.wsServer = wsServer;
+global.wsServer = wsServer; // 全局暴露 WebSocket 服务器实例，供其他模块访问
+global.apiServer = apiServer; // 全局暴露 HTTP 服务器实例，供其他模块访问
 
 let webSocket = {};
 
@@ -30,7 +31,46 @@ function startWebSocketServer() {
 
     wsServer.onMessageReceived = (client, msg) => {
         console.log("log", `📩 ${client.path}：${msg}`);
+        // 处理来自websocket的消息
+        handel_websocket_message(client, msg);
     };
+}
+
+function handel_websocket_message(client, msg) {
+    switch (client.path) {
+        case "/ws/voichai":
+            handle_voichai_websocket_message(client, msg);
+            break;
+        case "/ws/mxdict":
+            handle_mxdict_websocket_message(client, msg);
+            break;
+        default:
+            console.warn("未知路径消息：", client.path);
+    }
+}
+
+const handle_mxdict_websocket_message = (client, msg) => {
+    // 处理来自 mxdict 的消息
+    console.log("处理 mxdict 消息：", msg);
+    try {
+        const message = JSON.parse(msg);
+        switch (message.type) {
+            case "toggle_floating_pin":
+                handle_mxdict_toggle_floating_pin(message.data);
+                break;
+            default:
+                break;
+        }
+    } catch (err) {
+        console.error("解析 JSON 消息失败：", err);
+    }
+};
+
+function handle_mxdict_toggle_floating_pin(data) {
+    const winId = "mxdict-dict-" + data.session_id;
+    const wsId = data.client_id;
+    const session_id = data.session_id;
+    fixedWindowsManager.togglePinWindow(winId, wsId, session_id);
 }
 
 // 启动 HTTP 接口服务
@@ -101,10 +141,11 @@ async function handl_mxdict_message_setup() {
         // 3. 等待连接成功（最多 5 秒）
         let waiting_count = 0;
         while (waiting_count < 10) {
-            // console.log("global.wsServer:", global.wsServer);
-            // console.log("wsServer:", wsServer);
-
-            if (global.wsServer.connections["/ws/mxdict"]) {
+            const connections = global.wsServer.getConnections();
+            const connection = Object.values(connections).find(
+                (client) => client.path === "/ws/mxdict",
+            );
+            if (connection) {
                 return true;
             }
             await new Promise((resolve) => setTimeout(resolve, 500));
@@ -121,8 +162,15 @@ async function handl_mxdict_message_setup() {
 }
 
 function handle_mxdict_toggle_top_window(data) {
-    fixedWindowsManager.toggleWindowVisible(data.url);
-    console.log("toggle top window:", data.url);
+    const winId = data.win_id;
+    const url = data.url;
+    const session_id = data.session_id;
+    const connections = global.wsServer.getConnections();
+    const wsId = Object.values(connections).find(
+        (client) => client.path === "/ws/mxdict",
+    )?.id;
+    fixedWindowsManager.toggleWindowVisible(winId, url, wsId, session_id);
+    console.log("toggle top window:", data);
 }
 
 // websocket
