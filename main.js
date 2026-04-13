@@ -49,6 +49,30 @@ function handel_websocket_message(client, msg) {
     }
 }
 
+const handle_voichai_websocket_message = (client, msg) => {
+    // 处理来自 voichai 的消息
+    console.log("处理 voichai 消息：", msg);
+    try {
+        const message = JSON.parse(msg);
+        switch (message.type) {
+            case "toggle_floating_pin":
+                handle_voichai_toggle_floating_pin(message.data);
+                break;
+            default:
+                break;
+        }
+    } catch (err) {
+        console.error("解析 JSON 消息失败：", err);
+    }
+};
+
+function handle_voichai_toggle_floating_pin(data) {
+    const winId = "voichai-chat-" + data.session_id;
+    const wsId = data.client_id;
+    const session_id = data.session_id;
+    fixedWindowsManager.togglePinWindow(winId, wsId, session_id);
+}
+
 const handle_mxdict_websocket_message = (client, msg) => {
     // 处理来自 mxdict 的消息
     console.log("处理 mxdict 消息：", msg);
@@ -76,9 +100,41 @@ function handle_mxdict_toggle_floating_pin(data) {
 // 启动 HTTP 接口服务
 function startHttpServer() {
     // 示例接口
-    apiServer.post("/api/voichai", (json, callback) => {
-        console.log("收到 POST JSON：", json);
-        callback({ success: true, data: "已接收" });
+    apiServer.post("/api/voichai", async (json, callback) => {
+        console.log("收到 voichai 消息：", json);
+
+        try {
+            const { type, data } = json;
+
+            // ✅ 关键：setup 不再传入 callback，只返回结果
+            const setupOk = await handle_voichai_message_setup();
+            if (!setupOk) {
+                callback({
+                    success: false,
+                    msg: "voichai 未连接或连接超时",
+                });
+                return;
+            }
+
+            // 处理业务
+            switch (type) {
+                case "toggle_top_window":
+                    handle_voichai_toggle_top_window(data);
+                    break;
+                case "show_top_window":
+                    handle_voichai_show_top_window(data);
+                    break;
+                default:
+                    callback({ success: false, msg: "未知 type 类型" });
+                    return;
+            }
+
+            // 成功返回
+            callback({ success: true, msg: "处理完成" });
+        } catch (err) {
+            console.error("处理 voichai 错误：", err);
+            callback({ success: false, msg: "服务器错误：" + err.message });
+        }
     });
 
     // ✅ 修复后的 mxdict 接口
@@ -89,7 +145,7 @@ function startHttpServer() {
             const { type, data } = json;
 
             // ✅ 关键：setup 不再传入 callback，只返回结果
-            const setupOk = await handl_mxdict_message_setup();
+            const setupOk = await handle_mxdict_message_setup();
             if (!setupOk) {
                 callback({
                     success: false,
@@ -102,6 +158,9 @@ function startHttpServer() {
             switch (type) {
                 case "toggle_top_window":
                     handle_mxdict_toggle_top_window(data);
+                    break;
+                case "show_top_window":
+                    handle_mxdict_show_top_window(data);
                     break;
                 default:
                     callback({ success: false, msg: "未知 type 类型" });
@@ -119,8 +178,49 @@ function startHttpServer() {
     apiServer.start();
 }
 
+async function handle_voichai_message_setup() {
+    // 已经连接，直接返回成功
+    if (global.wsServer.connections["/ws/voichai"]) {
+        return true;
+    }
+
+    try {
+        // 1. 调用 Python 接口
+        const response = await axios.get(
+            "http://localhost:4999/api/connectiwin",
+        );
+
+        // 2. 检查返回状态
+        if (!response.data.status) {
+            console.log("❌ 命令 mxdict 连接 iwin 失败");
+            return false;
+        }
+
+        // 3. 等待连接成功（最多 5 秒）
+        let waiting_count = 0;
+        while (waiting_count < 10) {
+            const connections = global.wsServer.getConnections();
+            const connection = Object.values(connections).find(
+                (client) => client.path === "/ws/voichai",
+            );
+            if (connection) {
+                return true;
+            }
+            await new Promise((resolve) => setTimeout(resolve, 500));
+            waiting_count++;
+        }
+
+        // 超时
+        console.log("❌ 等待 voichai 连接超时");
+        return false;
+    } catch (err) {
+        console.log("❌ 请求 connectiwin 接口失败：", err.message);
+        return false;
+    }
+}
+
 // ✅ 不再传入 callback，只返回 true/false
-async function handl_mxdict_message_setup() {
+async function handle_mxdict_message_setup() {
     // 已经连接，直接返回成功
     if (global.wsServer.connections["/ws/mxdict"]) {
         return true;
@@ -161,6 +261,30 @@ async function handl_mxdict_message_setup() {
     }
 }
 
+function handle_voichai_toggle_top_window(data) {
+    const winId = data.win_id;
+    const url = data.url;
+    const session_id = data.session_id;
+    const connections = global.wsServer.getConnections();
+    const wsId = Object.values(connections).find(
+        (client) => client.path === "/ws/voichai",
+    )?.id;
+    fixedWindowsManager.toggleWindowVisible(winId, url, wsId, session_id);
+    console.log("toggle top window:", data);
+}
+
+function handle_voichai_show_top_window(data) {
+    const winId = data.win_id;
+    const url = data.url;
+    const session_id = data.session_id;
+    const connections = global.wsServer.getConnections();
+    const wsId = Object.values(connections).find(
+        (client) => client.path === "/ws/voichai",
+    )?.id;
+    fixedWindowsManager.showWindow(winId, url, wsId, session_id);
+    console.log("show top window:", data);
+}
+
 function handle_mxdict_toggle_top_window(data) {
     const winId = data.win_id;
     const url = data.url;
@@ -173,75 +297,19 @@ function handle_mxdict_toggle_top_window(data) {
     console.log("toggle top window:", data);
 }
 
-// websocket
-function retryWebsocketConnection() {
-    let timer = setTimeout(async () => {
-        clearTimeout(timer);
-        if (webSocket.readyState !== WebSocket.OPEN) {
-            try {
-                await webSocketManager();
-            } catch (error) {
-                console.log("This could be an expected exception:", error);
-                return [];
-            }
-        }
-    }, 5000);
-}
-
-async function handleMessage(message) {
-    switch (message.type) {
-        case "new_window":
-            createWindow(message.data.url);
-            break;
-        case "update_theme":
-            if (message.data.theme === "auto") {
-                nativeTheme.themeSource = "system";
-            } else {
-                nativeTheme.themeSource = message.data.theme;
-            }
-            break;
-        case "toggle_top_window":
-            fixedWindowsManager.toggleWindowVisible(message.data.url);
-            break;
-        case "toggle_float_pin":
-            fixedWindowsManager.togglePinWindow(message.data.url);
-            break;
-        default:
-            break;
-    }
-}
-
-const options = {
-    rejectUnauthorized: false, // Bypass SSL certificate verification
-};
-
-const agent = new http.Agent(options);
-
-async function webSocketManager() {
-    try {
-        const wsUrl = "ws://localhost:4999/ws/aichat/windows";
-        webSocket = new WebSocket(wsUrl, { agent });
-        global.webSocket = webSocket;
-        webSocket.onerror = (error) => {
-            // console.error("WebSocket error:", error);
-        };
-        // webSocket.onopen = (event) => {};
-        webSocket.onmessage = async (event) => {
-            const message = JSON.parse(event.data);
-            console.log("message:", message);
-            await handleMessage(message);
-        };
-        webSocket.onclose = (event) => {
-            retryWebsocketConnection();
-        };
-    } catch (error) {
-        console.error("WebSocket error:", error);
-        retryWebsocketConnection();
-    }
+function handle_mxdict_show_top_window(data) {
+    const winId = data.win_id;
+    const url = data.url;
+    const session_id = data.session_id;
+    const connections = global.wsServer.getConnections();
+    const wsId = Object.values(connections).find(
+        (client) => client.path === "/ws/mxdict",
+    )?.id;
+    fixedWindowsManager.showWindow(winId, url, wsId, session_id);
+    console.log("show top window:", data);
 }
 
 // 主窗口相关代码
-
 function createWindow() {
     // 创建一个小窗口，点击托盘图标弹出
     win = new BrowserWindow({

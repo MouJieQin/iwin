@@ -152,8 +152,30 @@ function toggleWindowVisible(winId, url, wsId, session_id) {
     }
 }
 
+/**
+ * 显示/隐藏窗口（对外暴露方法）
+ * @param {string} winId
+ * @param {string} url
+ * @param {string} wsId
+ * @param {string} session_id
+ */
+
+function showWindow(winId, url, wsId, session_id) {
+    if (!fixedWindows[winId]) {
+        return createFixedWindow(winId, url, wsId, session_id);
+    }
+    const win = fixedWindows[winId].fixedWindow;
+    if (win.isVisible()) {
+        win.focus();
+    } else {
+        win.show();
+        win.focus();
+    }
+}
+
 module.exports = {
     createFixedWindow,
+    showWindow,
     togglePinWindow,
     toggleWindowVisible,
 };
