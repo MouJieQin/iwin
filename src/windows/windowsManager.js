@@ -1,5 +1,6 @@
 const { BrowserWindow, screen } = require("electron");
 const path = require("path");
+const configManager = require("../config/config-manager");
 
 class WindowsManager {
     fixedWindows = {};
@@ -25,6 +26,12 @@ class WindowsManager {
             return;
         }
 
+        // 从配置文件中获取窗口配置
+        const windowConfig = configManager.getWindowConfig(winId);
+        if (!windowConfig) {
+            windowConfig = {};
+        }
+
         // 初始化窗口实例
         this.fixedWindows[winId] = {
             fixedWindow: null,
@@ -34,15 +41,17 @@ class WindowsManager {
             session_id: session_id,
         };
 
+        const windowWidth = windowConfig.width || 700;
+        const windowHeight = windowConfig.height || 700;
         const win = new BrowserWindow({
-            width: 700,
-            height: 1000,
-            alwaysOnTop: true,
-            movable: true,
-            titleBarStyle: "hidden", // 隐藏原生标题栏
-            // transparent: true,
+            width: windowWidth,
+            height: windowHeight,
+            alwaysOnTop: windowConfig.alwaysOnTop || true,
+            movable: windowConfig.movable || true,
+            titleBarStyle: windowConfig.titleBarStyle || "hidden", // 隐藏原生标题栏
+            // transparent: windowConfig.transparent || true,
             // 毛玻璃效果（仅限 macOS）
-            // vibrancy: "ultra-dark",
+            // vibrancy: windowConfig.vibrancy || "ultra-dark",
 
             webPreferences: {
                 preload: path.join(__dirname, "preload.js"),
@@ -54,9 +63,19 @@ class WindowsManager {
         this.fixedWindows[winId].fixedWindow = win;
 
         // win.webContents.openDevTools();
-        // 窗口出现在鼠标右下角
+
+        // 窗口出现在鼠标附近但能在屏幕内完全显示
+        const { width, height } = screen.getPrimaryDisplay().workAreaSize;
         const mouse = screen.getCursorScreenPoint();
-        win.setPosition(mouse.x + 20, mouse.y + 20);
+        let x = windowConfig.x || mouse.x + 20;
+        let y = windowConfig.y || mouse.y + 20;
+        if (x + windowWidth > width) {
+            x = width - windowWidth;
+        }
+        if (y + windowHeight > height) {
+            y = height - windowHeight;
+        }
+        win.setPosition(x, y);
 
         // macOS 专属优化（不压输入法、不压系统 UI）
         if (process.platform === "darwin") {
@@ -82,10 +101,41 @@ class WindowsManager {
                     is_pinned: this.fixedWindows[winId].pin,
                 },
             });
+
+            // 获取窗口当前位置和大小
+            const [x, y] = win.getPosition();
+            const [width, height] = win.getSize();
+
+            // 获取其他常用属性
+            const isAlwaysOnTop = win.isAlwaysOnTop();
+            const isMovable = win.isMovable();
+            const isFocused = win.isFocused();
+            const isMinimized = win.isMinimized();
+            const isMaximized = win.isMaximized();
+            const isResizable = win.isResizable();
+
+            // 组装成你想要的完整对象
+            const windowInfo = {
+                x,
+                y,
+                width,
+                height,
+                alwaysOnTop: isAlwaysOnTop,
+                movable: isMovable,
+                focused: isFocused,
+                minimized: isMinimized,
+                maximized: isMaximized,
+                resizable: isResizable,
+                title: win.getTitle(),
+            };
+
+            // 保存窗口数据到配置文件
+            const window = this.fixedWindows[winId].fixedWindow;
+            configManager.saveWindowConfig(winId, windowInfo);
         });
 
-        // 窗口完全销毁时清理对象
         win.on("closed", () => {
+            // 窗口完全销毁时清理对象
             if (this.fixedWindows[winId]) {
                 this.fixedWindows[winId].fixedWindow = null;
                 delete this.fixedWindows[winId];
@@ -171,7 +221,13 @@ class WindowsManager {
 
     showWindow(winId, url, wsId, session_id, inactive = false) {
         if (!this.fixedWindows[winId]) {
-            return this.createFixedWindow(winId, url, wsId, session_id, inactive);
+            return this.createFixedWindow(
+                winId,
+                url,
+                wsId,
+                session_id,
+                inactive,
+            );
         }
         const win = this.fixedWindows[winId].fixedWindow;
         if (inactive) {
