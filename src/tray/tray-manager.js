@@ -1,5 +1,7 @@
-const { Tray, screen, Menu, BrowserWindow } = require("electron");
+const { warn } = require("console");
+const { Tray, screen, Menu, BrowserWindow, nativeImage } = require("electron");
 const path = require("path");
+const appManager = require("../appManager/app-manager");
 
 class TrayManager {
     constructor(tray, win) {
@@ -34,67 +36,117 @@ class TrayManager {
         });
     }
 
-    createTray() {
+    async createTray() {
         // 托盘图标（macOS 推荐使用 16x16、黑色透明图标）
         const iconPath = path.join(__dirname, "../../icon.png");
         this.tray = new Tray(iconPath);
 
-        // 托盘菜单
-        const contextMenu = Menu.buildFromTemplate([
-            { label: "显示窗口", click: () => win.show() },
-            { type: "separator" },
-            {
-                label: "voichai",
-                submenu: [
-                    {
-                        label: "切换窗口",
-                        click: () => handle_voichai_toggle_top_window(data),
+        // 状态：用来动态切换图标
+        this.voichaiTop = false;
+        this.mxdictTop = false;
+
+        // ==============================================
+        // 动态构建菜单（可随时刷新）
+        // ==============================================
+        this.buildContextMenu = async () => {
+            const isKeyboardRunning = await appManager.checkKeyboardRunning();
+            const isMxdictRunning = await appManager.checkMxdictRunning();
+            const isVoichaiRunning = await appManager.checkVoichaiRunning();
+
+            return Menu.buildFromTemplate([
+                {
+                    label: "显示窗口",
+                    click: () => {
+                        this.win.show();
                     },
-                    {
-                        label: "显示窗口",
-                        click: () => handle_voichai_show_top_window(data),
-                    },
-                ],
-            },
-            { type: "separator" },
-            {
-                label: "mxdict",
-                submenu: [
-                    {
-                        label: "切换窗口",
-                        click: () => handle_mxdict_toggle_top_window(data),
-                    },
-                    {
-                        label: "显示窗口",
-                        click: () => handle_mxdict_show_top_window(data),
-                    },
-                ],
-            },
-            { label: "退出", click: () => app.quit() },
-        ]);
+                },
+                { type: "separator" },
+                {
+                    label: "keyboard",
+                    icon: this.createElementIcon(
+                        isKeyboardRunning ? "running" : "stopped",
+                    ),
+                    submenu: [
+                        {
+                            label: isKeyboardRunning ? "停止" : "启动",
+
+                            click: async () => {
+                                if (isKeyboardRunning) {
+                                    await appManager.stopKeyboard();
+                                } else {
+                                    await appManager.launchKeyboard();
+                                }
+                                // handle_mxdict_toggle_top_window(data);
+                                this.tray.setContextMenu(
+                                    await this.buildContextMenu(),
+                                );
+                                return false; // 👈 不消失
+                            },
+                        },
+                    ],
+                },
+
+                { type: "separator" },
+
+                {
+                    label: "voichai",
+                    icon: this.createElementIcon(
+                        isVoichaiRunning ? "running" : "stopped",
+                    ),
+                },
+
+                { type: "separator" },
+                {
+                    label: "mxdict",
+                    icon: this.createElementIcon(
+                        isMxdictRunning ? "running" : "stopped",
+                    ),
+                },
+
+                { type: "separator" },
+                {
+                    label: "退出",
+                    click: () => global.app.quit(),
+                },
+            ]);
+        };
+
+        // ==============================================
+        // 核心工具：把 Element 图标 SVG 转成托盘图标
+        // ==============================================
+        this.createElementIcon = (type) => {
+            const icons = {
+                running: path.join(__dirname, "../../assets/icons/running.png"),
+                stopped: path.join(__dirname, "../../assets/icons/stopped.png"),
+                warning: path.join(__dirname, "../../assets/icons/warning.png"),
+            };
+
+            return nativeImage.createFromPath(icons[type]);
+        };
 
         this.tray.setToolTip("我的 Electron 菜单栏应用");
-        this.tray.setContextMenu(contextMenu);
+        this.tray.setContextMenu(await this.buildContextMenu());
 
         // 点击托盘图标切换窗口显示/隐藏
-        this.tray.on("click", () => {
-            if (this.win.isVisible()) {
-                this.win.hide();
-            } else {
-                // 让窗口显示在托盘图标正下方
-                const trayBounds = this.tray.getBounds();
-                const windowBounds = this.win.getBounds();
+        this.tray.on("click", async () => {
+            this.tray.setContextMenu(await this.buildContextMenu());
+            // if (this.win.isVisible()) {
+            //     this.win.hide();
+            // } else {
+            //     // 让窗口显示在托盘图标正下方
+            //     const trayBounds = this.tray.getBounds();
+            //     const windowBounds = this.win.getBounds();
 
-                const x = Math.round(
-                    trayBounds.x +
-                        trayBounds.width / 2 -
-                        windowBounds.width / 2,
-                );
-                const y = Math.round(trayBounds.y + trayBounds.height);
+            //     const x = Math.round(
+            //         trayBounds.x +
+            //             trayBounds.width / 2 -
+            //             windowBounds.width / 2,
+            //     );
+            //     const y = Math.round(trayBounds.y + trayBounds.height);
 
-                this.win.setPosition(x, y);
-                this.win.show();
-            }
+            //     this.win.setPosition(x, y);
+            //     this.win.show();
+            // }
         });
     }
 }

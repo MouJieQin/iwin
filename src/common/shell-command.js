@@ -30,3 +30,5 @@ async function runShellCommandDialog(command) {
             return;
         });
 }
+
+module.exports = { runShellCommandDialog, runShellCommand };

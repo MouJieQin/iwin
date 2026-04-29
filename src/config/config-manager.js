@@ -17,6 +17,10 @@ class ConfigManager {
         this._setupConfig();
     }
 
+    getConfig() {
+        return this.config;
+    }
+
     getWindowConfigPath(windowId) {
         return path.join(this.configWindowsDir, windowId + ".json");
     }
@@ -41,21 +45,38 @@ class ConfigManager {
         fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
     }
 
+    saveConfig() {
+        fs.writeFileSync(this.configPath, JSON.stringify(this.config, null, 2));
+    }
+
     // set the default value recursively to the config if it that's in the root config file is not in the config file, but don't override the value if it's already set
-    _setDefaultValueRecursively(obj, defaultValue) {
-        for (const key in defaultValue) {
-            if (obj.hasOwnProperty(key)) {
-                if (typeof obj[key] === "object" && obj[key] !== null) {
-                    this._setDefaultValueRecursively(
-                        obj[key],
-                        defaultValue[key],
-                    );
-                } else {
-                    obj[key] = defaultValue[key];
-                }
+    /**
+     * 递归合并对象 b 到 a
+     * 规则：a 已有字段 → 不动
+     *      a 没有字段 → 从 b 复制过去
+     *      嵌套对象 → 递归处理
+     */
+    _setDefaultValueRecursively(a, b) {
+        for (const key in b) {
+            // 如果 b 的值是对象 && 不是 null
+            if (
+                typeof b[key] === "object" &&
+                b[key] !== null &&
+                !Array.isArray(b[key])
+            ) {
+                // 如果 a 没有这个字段，先创建空对象
+                if (!a[key]) a[key] = {};
+                // 递归合并
+                this._setDefaultValueRecursively(a[key], b[key]);
+            }
+            // 如果 a 没有这个 key，直接赋值
+            else if (!a.hasOwnProperty(key)) {
+                a[key] = b[key];
             }
         }
+        return a;
     }
+
     _setupConfig() {
         this.rootConfig = JSON.parse(
             fs.readFileSync(this.rootConfigPath, "utf-8"),
@@ -71,6 +92,7 @@ class ConfigManager {
         } else {
             this.config = JSON.parse(fs.readFileSync(this.configPath, "utf-8"));
             this._setDefaultValueRecursively(this.config, this.rootConfig);
+            this.saveConfig();
         }
     }
 }

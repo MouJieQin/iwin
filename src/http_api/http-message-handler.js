@@ -125,6 +125,44 @@ class HttpMessageHandler {
         }
     }
 
+    async check_mxdict_running() {
+        try {
+            // 1. 调用 Python 接口
+            const response = await axios.post(
+                "http://localhost:5959/api/command",
+                {
+                    type: "check_running",
+                    data: {},
+                },
+            );
+            if (!response.data.success) {
+                return false;
+            }
+            return true;
+        } catch (err) {
+            return false;
+        }
+    }
+
+    async check_voichai_running() {
+        try {
+            // 1. 调用 Python 接口
+            const response = await axios.post(
+                "http://localhost:4999/api/command",
+                {
+                    type: "check_running",
+                    data: {},
+                },
+            );
+            if (!response.data.success) {
+                return false;
+            }
+            return true;
+        } catch (err) {
+            return false;
+        }
+    }
+
     // ✅ 不再传入 callback，只返回 true/false
     async _handle_mxdict_message_setup() {
         // 已经连接，直接返回成功
@@ -213,11 +251,16 @@ class HttpMessageHandler {
         const wsId = Object.values(connections).find(
             (client) => client.path === "/ws/mxdict",
         )?.id;
-        global.windowsManager.showWindow(winId, url, wsId, session_id, inactive);
+        global.windowsManager.showWindow(
+            winId,
+            url,
+            wsId,
+            session_id,
+            inactive,
+        );
         console.log("show top window:", data);
     }
 }
-
 
 // 导出单例（全局唯一，方便其他文件直接引入使用）
 const httpMessageHandler = new HttpMessageHandler();
