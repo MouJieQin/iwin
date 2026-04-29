@@ -11,13 +11,18 @@ const fixedWindows = {};
  * @param {string} wsId - WebSocket 连接 ID
  * @param {string} session_id - 会话 ID
  */
-function createFixedWindow(winId, url, wsId, session_id) {
+function createFixedWindow(winId, url, wsId, session_id, inactive = false) {
     // 如果窗口已存在，直接显示并置顶
     if (fixedWindows[winId]?.fixedWindow) {
         const win = fixedWindows[winId].fixedWindow;
-        if (win.isMinimized()) win.restore();
-        win.show();
-        win.focus();
+        if (win.isMinimized()) {
+            win.restore();
+        }
+        if (inactive) {
+            win.showInactive();
+        } else {
+            win.show();
+        }
         return;
     }
 
@@ -49,6 +54,7 @@ function createFixedWindow(winId, url, wsId, session_id) {
 
     fixedWindows[winId].fixedWindow = win;
 
+    // win.webContents.openDevTools();
     // 窗口出现在鼠标右下角
     const mouse = screen.getCursorScreenPoint();
     win.setPosition(mouse.x + 20, mouse.y + 20);
@@ -69,7 +75,15 @@ function createFixedWindow(winId, url, wsId, session_id) {
 
     // ==================== 事件监听 ====================
     // 关闭时清理内存（重要）
-    win.on("close", (e) => {});
+    win.on("close", async (e) => {
+        await sendWebSocketMessage(wsId, {
+            type: "close_fixed_window",
+            data: {
+                session_id: session_id,
+                is_pinned: fixedWindows[winId].pin,
+            },
+        });
+    });
 
     // 窗口完全销毁时清理对象
     win.on("closed", () => {
@@ -87,21 +101,37 @@ function createFixedWindow(winId, url, wsId, session_id) {
         }
     });
 
+    win.once("ready-to-show", () => {
+        if (inactive) {
+            win.showInactive();
+        } else {
+            win.show();
+        }
+    });
+
     // 首次显示时发送 pin 状态
     win.once("show", async () => {
-        try {
-            setTimeout(() => {
-                sendPinStatus(wsId, fixedWindows[winId].pin, session_id);
-            }, 1000);
-        } catch (err) {
-            console.log("WebSocket 发送失败:", err);
+        if (inactive) {
+            win.showInactive();
+        } else {
+            win.show();
         }
+
+        // try {
+        //     setTimeout(() => {
+        //         sendPinStatus(wsId, fixedWindows[winId].pin, session_id);
+        //     }, 1000);
+        // } catch (err) {
+        //     console.log("WebSocket 发送失败:", err);
+        // }
     });
 }
 
 const sendWebSocketMessage = async (wsId, message) => {
     const ws = global.wsServer.getConnections()[wsId].ws;
     if (ws) {
+        console.log("发送消息:", message);
+        // 发送消息
         await ws.send(JSON.stringify(message));
     } else {
         console.log("WebSocket: id:" + wsId + "未初始化，无法发送消息");
@@ -123,13 +153,14 @@ const sendPinStatus = async (wsId, pin, session_id) => {
  * @param {string} winId
  * @param {string} wsId
  * @param {string} session_id
+ * @param {boolean} is_pinned - 是否固定
  */
-function togglePinWindow(winId, wsId, session_id) {
+function togglePinWindow(winId, wsId, session_id, is_pinned) {
     if (!fixedWindows[winId]) {
         return;
     }
-    fixedWindows[winId].pin = !fixedWindows[winId].pin;
-    sendPinStatus(wsId, fixedWindows[winId].pin, session_id);
+    fixedWindows[winId].pin = is_pinned;
+    sendPinStatus(wsId, is_pinned, session_id);
 }
 
 /**
@@ -160,16 +191,15 @@ function toggleWindowVisible(winId, url, wsId, session_id) {
  * @param {string} session_id
  */
 
-function showWindow(winId, url, wsId, session_id) {
+function showWindow(winId, url, wsId, session_id, inactive = false) {
     if (!fixedWindows[winId]) {
-        return createFixedWindow(winId, url, wsId, session_id);
+        return createFixedWindow(winId, url, wsId, session_id, inactive);
     }
     const win = fixedWindows[winId].fixedWindow;
-    if (win.isVisible()) {
-        win.focus();
+    if (inactive) {
+        win.showInactive();
     } else {
         win.show();
-        win.focus();
     }
 }
 

@@ -70,7 +70,8 @@ function handle_voichai_toggle_floating_pin(data) {
     const winId = "voichai-chat-" + data.session_id;
     const wsId = data.client_id;
     const session_id = data.session_id;
-    fixedWindowsManager.togglePinWindow(winId, wsId, session_id);
+    const is_pinned = data.is_pinned;
+    fixedWindowsManager.togglePinWindow(winId, wsId, session_id, is_pinned);
 }
 
 const handle_mxdict_websocket_message = (client, msg) => {
@@ -94,7 +95,8 @@ function handle_mxdict_toggle_floating_pin(data) {
     const winId = "mxdict-dict-" + data.session_id;
     const wsId = data.client_id;
     const session_id = data.session_id;
-    fixedWindowsManager.togglePinWindow(winId, wsId, session_id);
+    const is_pinned = data.is_pinned;
+    fixedWindowsManager.togglePinWindow(winId, wsId, session_id, is_pinned);
 }
 
 // 启动 HTTP 接口服务
@@ -301,11 +303,13 @@ function handle_mxdict_show_top_window(data) {
     const winId = data.win_id;
     const url = data.url;
     const session_id = data.session_id;
+    const inactive = data.inactive || false; // 是否显示但不激活
+
     const connections = global.wsServer.getConnections();
     const wsId = Object.values(connections).find(
         (client) => client.path === "/ws/mxdict",
     )?.id;
-    fixedWindowsManager.showWindow(winId, url, wsId, session_id);
+    fixedWindowsManager.showWindow(winId, url, wsId, session_id, inactive);
     console.log("show top window:", data);
 }
 
@@ -345,6 +349,33 @@ function createTray() {
     const contextMenu = Menu.buildFromTemplate([
         { label: "显示窗口", click: () => win.show() },
         { type: "separator" },
+        {
+            label: "voichai",
+            submenu: [
+                {
+                    label: "切换窗口",
+                    click: () => handle_voichai_toggle_top_window(data),
+                },
+                {
+                    label: "显示窗口",
+                    click: () => handle_voichai_show_top_window(data),
+                },
+            ],
+        },
+        { type: "separator" },
+        {
+            label: "mxdict",
+            submenu: [
+                {
+                    label: "切换窗口",
+                    click: () => handle_mxdict_toggle_top_window(data),
+                },
+                {
+                    label: "显示窗口",
+                    click: () => handle_mxdict_show_top_window(data),
+                },
+            ],
+        },
         { label: "退出", click: () => app.quit() },
     ]);
 
