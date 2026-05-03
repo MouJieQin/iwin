@@ -3,7 +3,9 @@
   "version": "0.1.1",
   "main": "main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "build": "electron-builder"
   },
   "keywords": [],
   "author": "",
@@ -17,5 +19,20 @@
     "axios": "^1.15.0",
     "uuid": "^13.0.0",
     "ws": "^8.20.0"
+  },
+  "build": {
+    "appId": "com.qinmoujie.iwin",
+    "productName": "iwin",
+    "mac": {
+      "target": "dmg",
+      "icon": "icon.icns"
+    },
+    "directories": {
+      "output": "dist"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
   }
 }

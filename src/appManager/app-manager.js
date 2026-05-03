@@ -24,13 +24,16 @@ class AppManager {
             });
     }
     async launchKeyboard() {
-        const launchCommand =
-            "cd " +
-            this.keyboardRootPath +
-            " && " +
-            " nohup ./cg_event_handler >>" +
-            this.keyboardRootPath +
-            "/cg_event_handler.2.log 2>&1 &";
+        // const launchCommand =
+        //     "cd " +
+        //     this.keyboardRootPath +
+        //     " && " +
+        //     " nohup ./cg_event_handler >>" +
+        //     this.keyboardRootPath +
+        // "/cg_event_handler.2.log 2>&1 &";
+
+        const launchCommand = this.keyboardRootPath + "/shell/keyboard-start";
+
         return await runShellCommand(launchCommand);
     }
     async stopKeyboard() {
