@@ -38,7 +38,7 @@ class AppManager {
     }
     async stopKeyboard() {
         const stopCommand =
-            "ps -ef | grep -v grep|grep -i -v code |grep -v tail| grep cg_event_handler | awk '{print $2}' | xargs -I {} kill -9 {}";
+            "ps -ef | grep -v grep|grep -i -v code |grep -v tail| grep cg_event_handler | awk '{print $2}' | xargs -I {} kill -15 {}";
         return await runShellCommand(stopCommand);
     }
     async checkMxdictRunning() {

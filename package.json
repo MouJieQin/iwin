@@ -24,8 +24,15 @@
     "appId": "com.qinmoujie.iwin",
     "productName": "iwin",
     "mac": {
+      "gatekeeperAssess": false,
       "target": "dmg",
-      "icon": "icon.icns"
+      "icon": "icon.icns",
+      "hardenedRuntime": true,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "extendInfo": {
+        "NSAccessibilityUsageDescription": "需要辅助功能权限"
+      }
     },
     "directories": {
       "output": "dist"
