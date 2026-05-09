@@ -3,6 +3,9 @@ const trayManager = require("./src/tray/tray-manager"); // 引入托盘管理器
 const windowsManager = require("./src/windows/windowsManager");
 const httpMessageHandler = require("./src/http_api/http-message-handler");
 const wsMessageHandler = require("./src/websocket_api/ws-message-handler"); // 引入全局服务
+const cgEventMessageHandler = require("./src/websocket_api/ws-cg-event-message-handler"); // 引入全局服务
+
+global.cgEventMessageHandler = cgEventMessageHandler; // 全局暴露 CGEvent 消息处理程序实例，供其他模块访问
 global.wsMessageHandler = wsMessageHandler; // 全局暴露 WebSocket 消息处理程序实例，供其他模块访问
 global.httpMessageHandler = httpMessageHandler; // 全局暴露 HTTP 消息处理程序实例，供其他模块访问
 global.trayManager = trayManager; // 全局暴露托盘管理器实例，供其他模块访问
@@ -19,6 +22,7 @@ app.whenReady().then(async () => {
     httpMessageHandler.startHttpServer();
     wsMessageHandler.startWebSocketServer();
 
+    await cgEventMessageHandler.webSocketManager();
     app.on("activate", () => {
         if (BrowserWindow.getAllWindows().length === 0) {
             trayManager.createWindow();

@@ -1,6 +1,7 @@
 const { BrowserWindow, screen } = require("electron");
 const path = require("path");
 const configManager = require("../config/config-manager");
+const cgEventMessageHandler = require("../websocket_api/ws-cg-event-message-handler"); // 引入全局服务
 
 class WindowsManager {
     fixedWindows = {};
@@ -59,6 +60,9 @@ class WindowsManager {
                 nodeIntegration: false,
             },
         });
+
+        win.setMinimizable(false);
+        win.setMaximizable(false);
 
         this.fixedWindows[winId].fixedWindow = win;
 
@@ -130,7 +134,6 @@ class WindowsManager {
             };
 
             // 保存窗口数据到配置文件
-            const window = this.fixedWindows[winId].fixedWindow;
             configManager.saveWindowConfig(winId, windowInfo);
         });
 
@@ -140,6 +143,25 @@ class WindowsManager {
                 this.fixedWindows[winId].fixedWindow = null;
                 delete this.fixedWindows[winId];
             }
+            // 注销事件
+            cgEventMessageHandler.unregisterEvent(
+                winId,
+                "kCGEventLeftMouseDown",
+            );
+        });
+
+        win.on("focus", () => {
+            cgEventMessageHandler.unregisterEvent(
+                winId,
+                "kCGEventLeftMouseDown",
+            );
+        });
+
+        win.on("hide", () => {
+            cgEventMessageHandler.unregisterEvent(
+                winId,
+                "kCGEventLeftMouseDown",
+            );
         });
 
         // 失焦隐藏（未固定时）
@@ -152,7 +174,11 @@ class WindowsManager {
 
         win.once("ready-to-show", () => {
             if (inactive) {
-                win.showInactive();
+                console.log("ready-to-show-inactive");
+                // win.hide();
+                // setTimeout(() => {
+                //     win.showInactive();
+                // }, 1000);
             } else {
                 win.show();
             }
@@ -161,6 +187,8 @@ class WindowsManager {
         // 首次显示时发送 pin 状态
         win.once("show", async () => {
             if (inactive) {
+                console.log("show-inactive");
+                // win.hide();
                 win.showInactive();
             } else {
                 win.show();
@@ -232,6 +260,22 @@ class WindowsManager {
         const win = this.fixedWindows[winId].fixedWindow;
         if (inactive) {
             win.showInactive();
+            // 注册事件回调
+            cgEventMessageHandler.registerEvent(
+                winId,
+                "kCGEventLeftMouseDown",
+                (data) => {
+                    console.log("[CGEvent Callback]:", data);
+                    if (!win.isFocused()) {
+                        win.hide();
+                    }
+                    // setTimeout(() => {
+                    //     if (!win.isFocused()) {
+                    //         win.hide();
+                    //     }
+                    // }, 50);
+                },
+            );
         } else {
             win.show();
         }
