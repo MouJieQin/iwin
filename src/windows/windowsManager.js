@@ -261,34 +261,31 @@ class WindowsManager {
         if (inactive) {
             win.showInactive();
             // 注册事件回调
-            cgEventMessageHandler.registerEvent(
-                winId,
-                "kCGEventLeftMouseDown",
-                (data) => {
-                    console.log("[CGEvent Callback]:", data);
-                    const x = data.x;
-                    const y = data.y;
-                    const [winX, winY] = win.getPosition();
-                    const [width, height] = win.getSize();
-                    if (!win.isFocused()) {
-                        if (
-                            !(
-                                x >= winX &&
-                                x <= winX + width &&
-                                y >= winY &&
-                                y <= winY + height
-                            )
-                        ) {
-                            win.hide();
+            if (!this.fixedWindows[winId].pin) {
+                cgEventMessageHandler.registerEvent(
+                    winId,
+                    "kCGEventLeftMouseDown",
+                    (data) => {
+                        console.log("[CGEvent Callback]:", data);
+                        const x = data.x;
+                        const y = data.y;
+                        const [winX, winY] = win.getPosition();
+                        const [width, height] = win.getSize();
+                        if (!win.isFocused()) {
+                            if (
+                                !(
+                                    x >= winX &&
+                                    x <= winX + width &&
+                                    y >= winY &&
+                                    y <= winY + height
+                                )
+                            ) {
+                                win.hide();
+                            }
                         }
-                    }
-                    // setTimeout(() => {
-                    //     if (!win.isFocused()) {
-                    //         win.hide();
-                    //     }
-                    // }, 50);
-                },
-            );
+                    },
+                );
+            }
         } else {
             win.show();
         }

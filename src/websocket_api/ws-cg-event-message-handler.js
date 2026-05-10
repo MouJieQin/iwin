@@ -47,6 +47,9 @@ class WsCgEventMessageHandler {
     // 注销事件
     unregisterEvent(registedId, eventType) {
         if (this.register[eventType]) {
+            if (Object.keys(this.register[eventType]).length === 0) {
+                return;
+            }
             delete this.register[eventType][registedId];
             // 注销事件类型
             if (Object.keys(this.register[eventType]).length === 0) {
@@ -94,14 +97,6 @@ class WsCgEventMessageHandler {
             this.wsClient = new WebSocket(wsUrl, { agent });
             this.wsClient.onopen = () => {
                 console.log("✅ 已连接 C++ WebSocket 服务");
-                // this.wsClient.send(
-                //     JSON.stringify({
-                //         type: "register_request",
-                //         data: {
-                //             event: "kCGEventLeftMouseDown",
-                //         },
-                //     }),
-                // );
             };
             this.wsClient.onerror = (error) => {
                 // console.error("WebSocket error:", error);
