@@ -11,9 +11,9 @@ class WsCgEventMessageHandler {
     _retryWebsocketConnection() {
         let timer = setTimeout(async () => {
             clearTimeout(timer);
-            if (webSocket.readyState !== WebSocket.OPEN) {
+            if (this.wsClient.readyState !== WebSocket.OPEN) {
                 try {
-                    await webSocketManager();
+                    await this.webSocketManager();
                 } catch (error) {
                     console.log("This could be an expected exception:", error);
                     return [];
