@@ -76,6 +76,9 @@ class WsMessageHandler {
                 case "toggle_floating_pin":
                     this._handle_mxdict_toggle_floating_pin(message.data);
                     break;
+                case "note_is_editing":
+                    this._handle_mxdict_note_is_editing(message.data);
+                    break;
                 default:
                     break;
             }
@@ -95,6 +98,12 @@ class WsMessageHandler {
             session_id,
             is_pinned,
         );
+    }
+
+    _handle_mxdict_note_is_editing(data) {
+        const winId = "mxdict-dict-" + data.session_id;
+        const is_editing = data.is_editing;
+        global.windowsManager.setWindownNoteEditingSatus(winId, is_editing);
     }
 }
 

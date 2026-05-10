@@ -172,7 +172,8 @@ class WindowsManager {
         // 失焦隐藏（未固定时）
         win.on("blur", () => {
             const { pin } = this.fixedWindows[winId];
-            if (!pin && win.isVisible()) {
+            const is_editing = this.fixedWindows[winId].is_editing || false;
+            if (!pin && win.isVisible() && !is_editing) {
                 win.hide();
             }
         });
@@ -180,10 +181,6 @@ class WindowsManager {
         win.once("ready-to-show", () => {
             if (inactive) {
                 console.log("ready-to-show-inactive");
-                // win.hide();
-                // setTimeout(() => {
-                //     win.showInactive();
-                // }, 1000);
             } else {
                 win.show();
             }
@@ -198,6 +195,18 @@ class WindowsManager {
                 win.show();
             }
         });
+    }
+
+    /**
+     * @param {string} winId
+     * @param {boolean} is_editing
+     */
+
+    setWindownNoteEditingSatus(winId, is_editing) {
+        if (!this.fixedWindows[winId]) {
+            return;
+        }
+        this.fixedWindows[winId].is_editing = is_editing;
     }
 
     /**
