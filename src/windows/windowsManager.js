@@ -47,6 +47,7 @@ class WindowsManager {
         const win = new BrowserWindow({
             width: windowWidth,
             height: windowHeight,
+            show: !inactive,
             alwaysOnTop: windowConfig.alwaysOnTop || true,
             movable: windowConfig.movable || true,
             titleBarStyle: windowConfig.titleBarStyle || "hidden", // 隐藏原生标题栏
@@ -94,6 +95,10 @@ class WindowsManager {
 
         // 加载页面
         win.loadURL(url);
+        if (inactive) {
+            win.showInactive();
+            this._registerleftMouseDownEvent(winId);
+        }
 
         // ==================== 事件监听 ====================
         // 关闭时清理内存（重要）
@@ -184,7 +189,6 @@ class WindowsManager {
             }
         });
 
-        // 首次显示时发送 pin 状态
         win.once("show", async () => {
             if (inactive) {
                 console.log("show-inactive");
@@ -193,14 +197,6 @@ class WindowsManager {
             } else {
                 win.show();
             }
-
-            // try {
-            //     setTimeout(() => {
-            //         sendPinStatus(wsId, this.fixedWindows[winId].pin, session_id);
-            //     }, 1000);
-            // } catch (err) {
-            //     console.log("WebSocket 发送失败:", err);
-            // }
         });
     }
 
@@ -262,34 +258,41 @@ class WindowsManager {
             win.showInactive();
             // 注册事件回调
             if (!this.fixedWindows[winId].pin) {
-                cgEventMessageHandler.registerEvent(
-                    winId,
-                    "kCGEventLeftMouseDown",
-                    (data) => {
-                        console.log("[CGEvent Callback]:", data);
-                        const x = data.x;
-                        const y = data.y;
-                        const [winX, winY] = win.getPosition();
-                        const [width, height] = win.getSize();
-                        if (!win.isFocused()) {
-                            if (
-                                !(
-                                    x >= winX &&
-                                    x <= winX + width &&
-                                    y >= winY &&
-                                    y <= winY + height
-                                )
-                            ) {
-                                win.hide();
-                            }
-                        }
-                    },
-                );
+                this._registerleftMouseDownEvent(winId);
             }
         } else {
             win.show();
         }
     }
+
+    _registerleftMouseDownEvent = (winId) => {
+        const win = this.fixedWindows[winId].fixedWindow;
+        cgEventMessageHandler.registerEvent(
+            winId,
+            "kCGEventLeftMouseDown",
+            (data) => {
+                console.log("[CGEvent Callback]:", data);
+                const x = data.x;
+                const y = data.y;
+                const [winX, winY] = win.getPosition();
+                const [width, height] = win.getSize();
+                if (!win.isFocused()) {
+                    if (
+                        !(
+                            x >= winX &&
+                            x <= winX + width &&
+                            y >= winY &&
+                            y <= winY + height
+                        )
+                    ) {
+                        if (!this.fixedWindows[winId].pin) {
+                            win.hide();
+                        }
+                    }
+                }
+            },
+        );
+    };
 
     _sendWebSocketMessage = async (wsId, message) => {
         const ws = global.wsServer.getConnections()[wsId].ws;
