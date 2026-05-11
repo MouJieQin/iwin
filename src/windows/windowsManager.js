@@ -103,43 +103,21 @@ class WindowsManager {
         // ==================== 事件监听 ====================
         // 关闭时清理内存（重要）
         win.on("close", async (e) => {
-            await this._sendWebSocketMessage(wsId, {
-                type: "close_fixed_window",
-                data: {
-                    session_id: session_id,
-                    is_pinned: this.fixedWindows[winId].pin,
-                },
-            });
-
-            // 获取窗口当前位置和大小
-            const [x, y] = win.getPosition();
-            const [width, height] = win.getSize();
-
-            // 获取其他常用属性
-            const isAlwaysOnTop = win.isAlwaysOnTop();
-            const isMovable = win.isMovable();
-            const isFocused = win.isFocused();
-            const isMinimized = win.isMinimized();
-            const isMaximized = win.isMaximized();
-            const isResizable = win.isResizable();
-
-            // 组装成你想要的完整对象
-            const windowInfo = {
-                x,
-                y,
-                width,
-                height,
-                alwaysOnTop: isAlwaysOnTop,
-                movable: isMovable,
-                focused: isFocused,
-                minimized: isMinimized,
-                maximized: isMaximized,
-                resizable: isResizable,
-                title: win.getTitle(),
-            };
-
             // 保存窗口数据到配置文件
-            configManager.saveWindowConfig(winId, windowInfo);
+            // this.saveWindowInfo(winId);
+
+            if (!app.isQuitting && inactive) {
+                e.preventDefault();
+                win.hide();
+            } else {
+                await this._sendWebSocketMessage(wsId, {
+                    type: "close_fixed_window",
+                    data: {
+                        session_id: session_id,
+                        is_pinned: this.fixedWindows[winId].pin,
+                    },
+                });
+            }
         });
 
         win.on("closed", () => {
@@ -197,6 +175,38 @@ class WindowsManager {
         });
     }
 
+    saveWindowInfo(winId) {
+        const win = this.fixedWindows[winId].fixedWindow;
+        const [x, y] = win.getPosition();
+        const [width, height] = win.getSize();
+
+        // 获取其他常用属性
+        const isAlwaysOnTop = win.isAlwaysOnTop();
+        const isMovable = win.isMovable();
+        const isFocused = win.isFocused();
+        const isMinimized = win.isMinimized();
+        const isMaximized = win.isMaximized();
+        const isResizable = win.isResizable();
+
+        // 组装成你想要的完整对象
+        const windowInfo = {
+            x,
+            y,
+            width,
+            height,
+            alwaysOnTop: isAlwaysOnTop,
+            movable: isMovable,
+            focused: isFocused,
+            minimized: isMinimized,
+            maximized: isMaximized,
+            resizable: isResizable,
+            title: win.getTitle(),
+        };
+
+        // 保存窗口数据到配置文件
+        configManager.saveWindowConfig(winId, windowInfo);
+    }
+
     /**
      * @param {string} winId
      * @param {boolean} is_editing
@@ -234,7 +244,13 @@ class WindowsManager {
      */
     toggleWindowVisible(winId, url, wsId, session_id, inactive = false) {
         if (!this.fixedWindows[winId]) {
-            return this.createFixedWindow(winId, url, wsId, session_id, inactive);
+            return this.createFixedWindow(
+                winId,
+                url,
+                wsId,
+                session_id,
+                inactive,
+            );
         }
         const win = this.fixedWindows[winId].fixedWindow;
         if (win.isVisible()) {

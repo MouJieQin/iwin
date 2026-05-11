@@ -32,3 +32,11 @@ app.whenReady().then(async () => {
 
 // 全部窗口关闭时不退出程序（mac 托盘应用标准行为）
 app.on("window-all-closed", () => {});
+
+// 全局退出（Dock quite / Cmd+Q）
+app.on("before-quit", () => {
+    app.isQuitting = true;
+    for (const winId in windowsManager.fixedWindows) {
+        windowsManager.saveWindowInfo(winId);
+    }
+});
