@@ -1,3 +1,4 @@
+const { screen } = require("electron");
 const http = require("http");
 const apiServer = require("./http-api-server");
 const axios = require("axios");
@@ -277,7 +278,46 @@ class HttpMessageHandler {
                     "[CGEvent handlerEventTextSelection Callback]:",
                     data,
                 );
-                win.showInactive();
+                if (global.windowsManager.fixedWindows[winId].pin) {
+                    win.showInactive();
+                } else {
+                    // 🔥 核心：获取鼠标【当前所在的屏幕】，而不是主屏幕
+                    const mouse = screen.getCursorScreenPoint();
+                    const currentDisplay = screen.getDisplayNearestPoint(mouse); // 关键修复！
+                    const {
+                        x: screenX,
+                        y: screenY,
+                        width: swidth,
+                        height: sheight,
+                    } = currentDisplay.workArea;
+
+                    // 窗口在鼠标附近弹出
+                    let x = mouse.x + 20;
+                    let y = mouse.y + 20;
+                    const [winWidth, winHeight] = win.getSize();
+
+                    // ===================== 屏幕内自动适配 =====================
+                    // 右边超出 → 往左放
+                    if (x + winWidth > screenX + swidth) {
+                        x = screenX + swidth - winWidth - 8; // 留8px边距
+                    }
+                    // 下边超出 → 往上放
+                    if (y + winHeight > screenY + sheight) {
+                        y = screenY + sheight - winHeight - 8;
+                    }
+                    // 左边太靠左 → 修正
+                    if (x < screenX + 8) {
+                        x = screenX + 8;
+                    }
+                    // 上边太靠上 → 修正
+                    if (y < screenY + 8) {
+                        y = screenY + 8;
+                    }
+
+                    // 定位并显示
+                    win.setPosition(x, y);
+                    win.showInactive();
+                }
                 if (!win.pin) {
                     global.windowsManager.registerleftMouseDownEvent(winId);
                 }

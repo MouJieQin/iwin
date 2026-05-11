@@ -22,21 +22,25 @@ class WsCgEventMessageHandler {
         }, 5000);
     }
 
+    regitserEventImple(eventType) {
+        // 注册事件类型
+        this.wsClient.send(
+            JSON.stringify({
+                type: "register_request",
+                data: {
+                    event: eventType,
+                },
+            }),
+        );
+    }
+
     // 注册事件
     registerEvent(registedId, eventType, callback) {
         if (
             !this.register[eventType] ||
             Object.keys(this.register[eventType]).length === 0
         ) {
-            // 注册事件类型
-            this.wsClient.send(
-                JSON.stringify({
-                    type: "register_request",
-                    data: {
-                        event: eventType,
-                    },
-                }),
-            );
+            this.regitserEventImple(eventType);
             console.log("✅ 注册事件类型:", eventType);
             this.register[eventType] = {};
             // 注册事件回调
@@ -63,6 +67,12 @@ class WsCgEventMessageHandler {
                 );
                 console.log("✅ 注销事件类型:", eventType);
             }
+        }
+    }
+
+    registerAllEventAgainAfterReconnect() {
+        for (const eventType in this.register) {
+            this.regitserEventImple(eventType);
         }
     }
 
@@ -97,6 +107,7 @@ class WsCgEventMessageHandler {
             this.wsClient = new WebSocket(wsUrl, { agent });
             this.wsClient.onopen = () => {
                 console.log("✅ 已连接 C++ WebSocket 服务");
+                this.registerAllEventAgainAfterReconnect();
             };
             this.wsClient.onerror = (error) => {
                 // console.error("WebSocket error:", error);
