@@ -267,87 +267,6 @@ class HttpMessageHandler {
         console.log("show top window:", data);
     }
 
-    _registerhandlerEventTextSelection = (winId) => {
-        const win = global.windowsManager.fixedWindows[winId].fixedWindow;
-        const session_id = global.windowsManager.fixedWindows[winId].session_id;
-        cgEventMessageHandler.registerEvent(
-            winId,
-            "handlerEventTextSelection",
-            async (data) => {
-                console.log(
-                    "[CGEvent handlerEventTextSelection Callback]:",
-                    data,
-                );
-                if (global.windowsManager.fixedWindows[winId].pin) {
-                    win.showInactive();
-                } else {
-                    // 🔥 核心：获取鼠标【当前所在的屏幕】，而不是主屏幕
-                    const mouse = screen.getCursorScreenPoint();
-                    const currentDisplay = screen.getDisplayNearestPoint(mouse); // 关键修复！
-                    const {
-                        x: screenX,
-                        y: screenY,
-                        width: swidth,
-                        height: sheight,
-                    } = currentDisplay.workArea;
-
-                    // 窗口在鼠标附近弹出
-                    let x = mouse.x + 20;
-                    let y = mouse.y + 20;
-                    const [winWidth, winHeight] = win.getSize();
-
-                    // ===================== 屏幕内自动适配 =====================
-                    // 右边超出 → 往左放
-                    if (x + winWidth > screenX + swidth) {
-                        x = screenX + swidth - winWidth - 8; // 留8px边距
-                    }
-                    // 下边超出 → 往上放
-                    if (y + winHeight > screenY + sheight) {
-                        y = screenY + sheight - winHeight - 8;
-                    }
-                    // 左边太靠左 → 修正
-                    if (x < screenX + 8) {
-                        x = screenX + 8;
-                    }
-                    // 上边太靠上 → 修正
-                    if (y < screenY + 8) {
-                        y = screenY + 8;
-                    }
-
-                    // 定位并显示
-                    win.setPosition(x, y);
-                    win.showInactive();
-                }
-                if (!win.pin) {
-                    global.windowsManager.registerleftMouseDownEvent(winId);
-                }
-                const text_selected = data.text_selected;
-                // 1. 调用 Python 接口
-                const response = await axios.post(
-                    "http://localhost:5959/api/command",
-                    {
-                        type: "lookup_keyword_request",
-                        data: {
-                            keyword: text_selected,
-                            session_id: session_id,
-                        },
-                    },
-                );
-                if (!response.data.success) {
-                    log.error("lookup_keyword_request 失败");
-                    return;
-                }
-            },
-        );
-    };
-
-    _unregisterhandlerEventTextSelection = (winId) => {
-        cgEventMessageHandler.unregisterEvent(
-            winId,
-            "handlerEventTextSelection",
-        );
-    };
-
     _handle_toggle_mxdict_selection_search_top_window(data) {
         const winId = data.win_id;
         const url = data.url;
@@ -369,14 +288,16 @@ class HttpMessageHandler {
             );
             global.mxdict_selection_search_window_winId = winId;
             global.windowsManager.fixedWindows[winId].active = true;
-            this._registerhandlerEventTextSelection(winId);
+            global.windowsManager.registerhandlerEventTextSelection(winId);
         } else {
             const win = global.windowsManager.fixedWindows[winId].fixedWindow;
             if (global.windowsManager.fixedWindows[winId].active) {
-                this._unregisterhandlerEventTextSelection(winId);
+                global.windowsManager.unregisterhandlerEventTextSelection(
+                    winId,
+                );
                 global.windowsManager.fixedWindows[winId].active = false;
             } else {
-                this._registerhandlerEventTextSelection(winId);
+                global.windowsManager.registerhandlerEventTextSelection(winId);
                 global.windowsManager.fixedWindows[winId].active = true;
             }
         }
