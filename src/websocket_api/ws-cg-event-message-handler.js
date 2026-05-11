@@ -8,7 +8,7 @@ class WsCgEventMessageHandler {
     }
 
     // websocket
-    _retryWebsocketConnection() {
+    async _retryWebsocketConnection() {
         let timer = setTimeout(async () => {
             clearTimeout(timer);
             if (this.wsClient.readyState !== WebSocket.OPEN) {
@@ -66,13 +66,13 @@ class WsCgEventMessageHandler {
         }
     }
 
-    _handleMessage(message) {
+    async _handleMessage(message) {
         console.log("cg_event_handler message:", message);
         switch (message.type) {
             case "CGEvent":
                 const cgEventType = message.data.type;
                 for (const registedId in this.register[cgEventType]) {
-                    this.register[cgEventType][registedId](message.data);
+                    await this.register[cgEventType][registedId](message.data);
                 }
                 break;
             case "update_theme":
@@ -102,17 +102,17 @@ class WsCgEventMessageHandler {
                 // console.error("WebSocket error:", error);
             };
             // webSocket.onopen = (event) => {};
-            this.wsClient.onmessage = (event) => {
+            this.wsClient.onmessage = async (event) => {
                 const message = JSON.parse(event.data);
                 console.log("message:", message);
-                this._handleMessage(message);
+                await this._handleMessage(message);
             };
-            this.wsClient.onclose = (event) => {
-                this._retryWebsocketConnection();
+            this.wsClient.onclose = async (event) => {
+                await this._retryWebsocketConnection();
             };
         } catch (error) {
             // console.error("WebSocket error:", error);
-            this._retryWebsocketConnection();
+            await this._retryWebsocketConnection();
         }
     }
 }

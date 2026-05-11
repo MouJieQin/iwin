@@ -96,8 +96,8 @@ class WindowsManager {
         // 加载页面
         win.loadURL(url);
         if (inactive) {
-            win.showInactive();
-            this._registerleftMouseDownEvent(winId);
+            // win.showInactive();
+            this.registerleftMouseDownEvent(winId);
         }
 
         // ==================== 事件监听 ====================
@@ -230,10 +230,11 @@ class WindowsManager {
      * @param {string} url
      * @param {string} wsId
      * @param {string} session_id
+     * @param {boolean} inactive - 是否显示但不激活
      */
-    toggleWindowVisible(winId, url, wsId, session_id) {
+    toggleWindowVisible(winId, url, wsId, session_id, inactive = false) {
         if (!this.fixedWindows[winId]) {
-            return this.createFixedWindow(winId, url, wsId, session_id);
+            return this.createFixedWindow(winId, url, wsId, session_id, inactive);
         }
         const win = this.fixedWindows[winId].fixedWindow;
         if (win.isVisible()) {
@@ -242,6 +243,7 @@ class WindowsManager {
             win.show();
             win.focus();
         }
+        return win;
     }
 
     /**
@@ -267,20 +269,19 @@ class WindowsManager {
             win.showInactive();
             // 注册事件回调
             if (!this.fixedWindows[winId].pin) {
-                this._registerleftMouseDownEvent(winId);
+                this.registerleftMouseDownEvent(winId);
             }
         } else {
             win.show();
         }
     }
 
-    _registerleftMouseDownEvent = (winId) => {
+    registerleftMouseDownEvent = (winId) => {
         const win = this.fixedWindows[winId].fixedWindow;
         cgEventMessageHandler.registerEvent(
             winId,
             "kCGEventLeftMouseDown",
             (data) => {
-                console.log("[CGEvent Callback]:", data);
                 const x = data.x;
                 const y = data.y;
                 const [winX, winY] = win.getPosition();
@@ -304,7 +305,11 @@ class WindowsManager {
     };
 
     _sendWebSocketMessage = async (wsId, message) => {
-        const ws = global.wsServer.getConnections()[wsId].ws;
+        const connection = global.wsServer.getConnections()[wsId];
+        if (!connection) {
+            return;
+        }
+        const ws = connection.ws;
         if (ws) {
             console.log("发送消息:", message);
             // 发送消息

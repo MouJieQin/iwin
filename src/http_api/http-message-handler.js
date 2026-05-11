@@ -68,6 +68,11 @@ class HttpMessageHandler {
                     case "show_top_window":
                         this._handle_mxdict_show_top_window(data);
                         break;
+                    case "toggle_selection_search_top_window":
+                        this._handle_toggle_mxdict_selection_search_top_window(
+                            data,
+                        );
+                        break;
                     default:
                         callback({ success: false, msg: "未知 type 类型" });
                         return;
@@ -259,6 +264,82 @@ class HttpMessageHandler {
             inactive,
         );
         console.log("show top window:", data);
+    }
+
+    _registerhandlerEventTextSelection = (winId) => {
+        const win = global.windowsManager.fixedWindows[winId].fixedWindow;
+        const session_id = global.windowsManager.fixedWindows[winId].session_id;
+        cgEventMessageHandler.registerEvent(
+            winId,
+            "handlerEventTextSelection",
+            async (data) => {
+                console.log(
+                    "[CGEvent handlerEventTextSelection Callback]:",
+                    data,
+                );
+                win.showInactive();
+                if (!win.pin) {
+                    global.windowsManager.registerleftMouseDownEvent(winId);
+                }
+                const text_selected = data.text_selected;
+                // 1. 调用 Python 接口
+                const response = await axios.post(
+                    "http://localhost:5959/api/command",
+                    {
+                        type: "lookup_keyword_request",
+                        data: {
+                            keyword: text_selected,
+                            session_id: session_id,
+                        },
+                    },
+                );
+                if (!response.data.success) {
+                    log.error("lookup_keyword_request 失败");
+                    return;
+                }
+            },
+        );
+    };
+
+    _unregisterhandlerEventTextSelection = (winId) => {
+        cgEventMessageHandler.unregisterEvent(
+            winId,
+            "handlerEventTextSelection",
+        );
+    };
+
+    _handle_toggle_mxdict_selection_search_top_window(data) {
+        const winId = data.win_id;
+        const url = data.url;
+        const session_id = data.session_id;
+        const inactive = data.inactive || true; // 是否显示但不激活
+
+        const connections = global.wsServer.getConnections();
+        const wsId = Object.values(connections).find(
+            (client) => client.path === "/ws/mxdict",
+        )?.id;
+
+        if (!global.windowsManager.fixedWindows[winId]) {
+            global.windowsManager.createFixedWindow(
+                winId,
+                url,
+                wsId,
+                session_id,
+                inactive,
+            );
+            global.mxdict_selection_search_window_winId = winId;
+            global.windowsManager.fixedWindows[winId].active = true;
+            this._registerhandlerEventTextSelection(winId);
+        } else {
+            const win = global.windowsManager.fixedWindows[winId].fixedWindow;
+            if (global.windowsManager.fixedWindows[winId].active) {
+                this._unregisterhandlerEventTextSelection(winId);
+                global.windowsManager.fixedWindows[winId].active = false;
+            } else {
+                this._registerhandlerEventTextSelection(winId);
+                global.windowsManager.fixedWindows[winId].active = true;
+            }
+        }
     }
 }
 
