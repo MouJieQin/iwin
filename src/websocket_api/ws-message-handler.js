@@ -29,8 +29,8 @@ class WsMessageHandler {
             case "/ws/voichai":
                 this._handle_voichai_websocket_message(client, msg);
                 break;
-            case "/ws/mxdict":
-                this._handle_mxdict_websocket_message(client, msg);
+            case "/ws/fstdict":
+                this._handle_fstdict_websocket_message(client, msg);
                 break;
             default:
                 console.warn("未知路径消息：", client.path);
@@ -67,17 +67,17 @@ class WsMessageHandler {
         );
     }
 
-    _handle_mxdict_websocket_message = (client, msg) => {
-        // 处理来自 mxdict 的消息
-        console.log("处理 mxdict 消息：", msg);
+    _handle_fstdict_websocket_message = (client, msg) => {
+        // 处理来自 fstdict 的消息
+        console.log("处理 fstdict 消息：", msg);
         try {
             const message = JSON.parse(msg);
             switch (message.type) {
                 case "toggle_floating_pin":
-                    this._handle_mxdict_toggle_floating_pin(message.data);
+                    this._handle_fstdict_toggle_floating_pin(message.data);
                     break;
                 case "note_is_editing":
-                    this._handle_mxdict_note_is_editing(message.data);
+                    this._handle_fstdict_note_is_editing(message.data);
                     break;
                 default:
                     break;
@@ -87,8 +87,8 @@ class WsMessageHandler {
         }
     };
 
-    _handle_mxdict_toggle_floating_pin(data) {
-        const winId = "mxdict-dict-" + data.session_id;
+    _handle_fstdict_toggle_floating_pin(data) {
+        const winId = "fstdict-dict-" + data.session_id;
         const wsId = data.client_id;
         const session_id = data.session_id;
         const is_pinned = data.is_pinned;
@@ -100,8 +100,8 @@ class WsMessageHandler {
         );
     }
 
-    _handle_mxdict_note_is_editing(data) {
-        const winId = "mxdict-dict-" + data.session_id;
+    _handle_fstdict_note_is_editing(data) {
+        const winId = "fstdict-dict-" + data.session_id;
         const is_editing = data.is_editing;
         global.windowsManager.setWindownNoteEditingSatus(winId, is_editing);
     }

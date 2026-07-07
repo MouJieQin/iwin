@@ -218,7 +218,7 @@ class WindowsManager {
             return;
         }
         this.fixedWindows[winId].is_editing = is_editing;
-        if (winId === global.mxdict_selection_search_window_winId) {
+        if (winId === global.fstdict_selection_search_window_winId) {
             if (is_editing) {
                 this.unregisterhandlerEventTextSelection(winId);
             } else {

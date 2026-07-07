@@ -44,19 +44,19 @@ class HttpMessageHandler {
             }
         });
 
-        // ✅ 修复后的 mxdict 接口
-        apiServer.post("/api/mxdict", async (json, callback) => {
-            console.log("收到 mxdict 消息：", json);
+        // ✅ 修复后的 fstdict 接口
+        apiServer.post("/api/fstdict", async (json, callback) => {
+            console.log("收到 fstdict 消息：", json);
 
             try {
                 const { type, data } = json;
 
                 // ✅ 关键：setup 不再传入 callback，只返回结果
-                const setupOk = await this._handle_mxdict_message_setup();
+                const setupOk = await this._handle_fstdict_message_setup();
                 if (!setupOk) {
                     callback({
                         success: false,
-                        msg: "mxdict 未连接或连接超时",
+                        msg: "fstdict 未连接或连接超时",
                     });
                     return;
                 }
@@ -64,13 +64,13 @@ class HttpMessageHandler {
                 // 处理业务
                 switch (type) {
                     case "toggle_top_window":
-                        this._handle_mxdict_toggle_top_window(data);
+                        this._handle_fstdict_toggle_top_window(data);
                         break;
                     case "show_top_window":
-                        this._handle_mxdict_show_top_window(data);
+                        this._handle_fstdict_show_top_window(data);
                         break;
                     case "toggle_selection_search_top_window":
-                        this._handle_toggle_mxdict_selection_search_top_window(
+                        this._handle_toggle_fstdict_selection_search_top_window(
                             data,
                         );
                         break;
@@ -82,7 +82,7 @@ class HttpMessageHandler {
                 // 成功返回
                 callback({ success: true, msg: "处理完成" });
             } catch (err) {
-                console.error("处理 mxdict 错误：", err);
+                console.error("处理 fstdict 错误：", err);
                 callback({ success: false, msg: "服务器错误：" + err.message });
             }
         });
@@ -104,7 +104,7 @@ class HttpMessageHandler {
 
             // 2. 检查返回状态
             if (!response.data.status) {
-                console.log("❌ 命令 mxdict 连接 iwin 失败");
+                console.log("❌ 命令 fstdict 连接 iwin 失败");
                 return false;
             }
 
@@ -131,7 +131,7 @@ class HttpMessageHandler {
         }
     }
 
-    async check_mxdict_running() {
+    async check_fstdict_running() {
         try {
             // 1. 调用 Python 接口
             const response = await axios.post(
@@ -170,9 +170,9 @@ class HttpMessageHandler {
     }
 
     // ✅ 不再传入 callback，只返回 true/false
-    async _handle_mxdict_message_setup() {
+    async _handle_fstdict_message_setup() {
         // 已经连接，直接返回成功
-        if (global.wsServer.connections["/ws/mxdict"]) {
+        if (global.wsServer.connections["/ws/fstdict"]) {
             return true;
         }
 
@@ -184,7 +184,7 @@ class HttpMessageHandler {
 
             // 2. 检查返回状态
             if (!response.data.status) {
-                console.log("❌ 命令 mxdict 连接 iwin 失败");
+                console.log("❌ 命令 fstdict 连接 iwin 失败");
                 return false;
             }
 
@@ -193,7 +193,7 @@ class HttpMessageHandler {
             while (waiting_count < 10) {
                 const connections = global.wsServer.getConnections();
                 const connection = Object.values(connections).find(
-                    (client) => client.path === "/ws/mxdict",
+                    (client) => client.path === "/ws/fstdict",
                 );
                 if (connection) {
                     return true;
@@ -203,7 +203,7 @@ class HttpMessageHandler {
             }
 
             // 超时
-            console.log("❌ 等待 mxdict 连接超时");
+            console.log("❌ 等待 fstdict 连接超时");
             return false;
         } catch (err) {
             console.log("❌ 请求 connectiwin 接口失败：", err.message);
@@ -235,19 +235,19 @@ class HttpMessageHandler {
         console.log("show top window:", data);
     }
 
-    _handle_mxdict_toggle_top_window(data) {
+    _handle_fstdict_toggle_top_window(data) {
         const winId = data.win_id;
         const url = data.url;
         const session_id = data.session_id;
         const connections = global.wsServer.getConnections();
         const wsId = Object.values(connections).find(
-            (client) => client.path === "/ws/mxdict",
+            (client) => client.path === "/ws/fstdict",
         )?.id;
         global.windowsManager.toggleWindowVisible(winId, url, wsId, session_id);
         console.log("toggle top window:", data);
     }
 
-    _handle_mxdict_show_top_window(data) {
+    _handle_fstdict_show_top_window(data) {
         const winId = data.win_id;
         const url = data.url;
         const session_id = data.session_id;
@@ -255,7 +255,7 @@ class HttpMessageHandler {
 
         const connections = global.wsServer.getConnections();
         const wsId = Object.values(connections).find(
-            (client) => client.path === "/ws/mxdict",
+            (client) => client.path === "/ws/fstdict",
         )?.id;
         global.windowsManager.showWindow(
             winId,
@@ -267,7 +267,7 @@ class HttpMessageHandler {
         console.log("show top window:", data);
     }
 
-    _handle_toggle_mxdict_selection_search_top_window(data) {
+    _handle_toggle_fstdict_selection_search_top_window(data) {
         const winId = data.win_id;
         const url = data.url;
         const session_id = data.session_id;
@@ -275,7 +275,7 @@ class HttpMessageHandler {
 
         const connections = global.wsServer.getConnections();
         const wsId = Object.values(connections).find(
-            (client) => client.path === "/ws/mxdict",
+            (client) => client.path === "/ws/fstdict",
         )?.id;
 
         if (!global.windowsManager.fixedWindows[winId]) {
@@ -286,7 +286,7 @@ class HttpMessageHandler {
                 session_id,
                 inactive,
             );
-            global.mxdict_selection_search_window_winId = winId;
+            global.fstdict_selection_search_window_winId = winId;
             global.windowsManager.fixedWindows[winId].active = true;
             global.windowsManager.registerhandlerEventTextSelection(winId);
         } else {

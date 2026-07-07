@@ -6,7 +6,7 @@ const configManager = require("../config/config-manager");
 
 class AppManager {
     constructor() {
-        this.mxdictTop = false;
+        this.fstdictTop = false;
         this.voichaiTop = false;
         this.config = configManager.getConfig();
         this.keyboardConfig = this.config.keyboard || {};
@@ -41,8 +41,8 @@ class AppManager {
             "ps -ef | grep -v grep|grep -i -v code |grep -v tail| grep cg_event_handler | awk '{print $2}' | xargs -I {} kill -15 {}";
         return await runShellCommand(stopCommand);
     }
-    async checkMxdictRunning() {
-        return await global.httpMessageHandler.check_mxdict_running();
+    async checkFstdictRunning() {
+        return await global.httpMessageHandler.check_fstdict_running();
     }
     async checkVoichaiRunning() {
         return await global.httpMessageHandler.check_voichai_running();

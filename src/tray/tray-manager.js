@@ -43,14 +43,14 @@ class TrayManager {
 
         // 状态：用来动态切换图标
         this.voichaiTop = false;
-        this.mxdictTop = false;
+        this.fstdictTop = false;
 
         // ==============================================
         // 动态构建菜单（可随时刷新）
         // ==============================================
         this.buildContextMenu = async () => {
             const isKeyboardRunning = await appManager.checkKeyboardRunning();
-            const isMxdictRunning = await appManager.checkMxdictRunning();
+            const isFstdictRunning = await appManager.checkFstdictRunning();
             const isVoichaiRunning = await appManager.checkVoichaiRunning();
 
             return Menu.buildFromTemplate([
@@ -76,7 +76,7 @@ class TrayManager {
                                 } else {
                                     await appManager.launchKeyboard();
                                 }
-                                // handle_mxdict_toggle_top_window(data);
+                                // handle_fstdict_toggle_top_window(data);
                                 this.tray.setContextMenu(
                                     await this.buildContextMenu(),
                                 );
@@ -97,9 +97,9 @@ class TrayManager {
 
                 { type: "separator" },
                 {
-                    label: "mxdict",
+                    label: "fstdict",
                     icon: this.createElementIcon(
-                        isMxdictRunning ? "running" : "stopped",
+                        isFstdictRunning ? "running" : "stopped",
                     ),
                 },
 
